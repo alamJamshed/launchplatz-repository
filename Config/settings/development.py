@@ -36,6 +36,35 @@ CSRF_TRUSTED_ORIGINS = [
 # SMTP Encryption Key (generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
 SMTP_ENCRYPTION_KEY = config('SMTP_ENCRYPTION_KEY', default=None)
 
+# Required before server credentials can be stored or used.
+SERVER_CREDENTIAL_ENCRYPTION_KEY = config(
+    'SERVER_CREDENTIAL_ENCRYPTION_KEY', default=None
+)
+SSH_CONNECTION_TIMEOUT = config('SSH_CONNECTION_TIMEOUT', default=30, cast=int)
+GIT_CREDENTIAL_ENCRYPTION_KEY = config(
+    'GIT_CREDENTIAL_ENCRYPTION_KEY', default=None
+)
+ENVIRONMENT_VARIABLE_ENCRYPTION_KEY = config(
+    'ENVIRONMENT_VARIABLE_ENCRYPTION_KEY', default=None
+)
+GIT_OPERATION_TIMEOUT = config('GIT_OPERATION_TIMEOUT', default=120, cast=int)
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default=None)
+CELERY_RESULT_BACKEND = config(
+    'CELERY_RESULT_BACKEND', default=CELERY_BROKER_URL
+)
+DEPLOYMENT_COMMAND_TIMEOUT = config(
+    'DEPLOYMENT_COMMAND_TIMEOUT', default=600, cast=int
+)
+DEPLOYMENT_HEALTH_TIMEOUT = config(
+    'DEPLOYMENT_HEALTH_TIMEOUT', default=120, cast=int
+)
+DOCKER_ACTION_TIMEOUT = config('DOCKER_ACTION_TIMEOUT', default=60, cast=int)
+DOCKER_STOP_TIMEOUT = config('DOCKER_STOP_TIMEOUT', default=10, cast=int)
+DOCKER_LOG_MAX_LINES = config('DOCKER_LOG_MAX_LINES', default=1000, cast=int)
+DOCKER_LOG_MAX_CHARACTERS = config(
+    'DOCKER_LOG_MAX_CHARACTERS', default=200000, cast=int
+)
+
 # Frontend URL for email links
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 PASSWORD_RESET_TIMEOUT_HOURS = 24

@@ -10,10 +10,17 @@ env
 
 #src
 *.sqlite*
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+.ssh/
 venv
 .idea
 .env
 !.env.example
+.env.docker
 media
 static
-*/migrations/00*
+/logs/
+/deployment-demo/

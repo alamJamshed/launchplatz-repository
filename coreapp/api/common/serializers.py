@@ -1,6 +1,7 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 from coreapp.models import User, Country, State, City
+from coreapp.roles import UserRoles
 
 
 class LoginSerializer(serializers.Serializer):
@@ -13,10 +14,8 @@ class LoginSerializer(serializers.Serializer):
 
         if email and password:
             user = authenticate(email=email, password=password)
-            if not user:
+            if not user or not user.is_active or user.role != UserRoles.ADMIN:
                 raise serializers.ValidationError('Invalid credentials')
-            if not user.is_active:
-                raise serializers.ValidationError('Account is disabled')
             attrs['user'] = user
         return attrs
 
@@ -24,8 +23,11 @@ class LoginSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'email', 'phone', 'role', 'is_verified']
-        read_only_fields = ['id', 'email', 'role']
+        fields = [
+            'id', 'first_name', 'last_name', 'email', 'phone', 'role',
+            'is_verified', 'is_approved', 'is_active',
+        ]
+        read_only_fields = fields
 
 
 class CountrySerializer(serializers.ModelSerializer):

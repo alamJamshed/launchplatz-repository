@@ -15,9 +15,13 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'drf_spectacular',
+    'rest_framework_simplejwt.token_blacklist',
     # Local apps
     'coreapp.apps.CoreappConfig',
     'utility.apps.UtilityConfig',
+    'servers.apps.ServersConfig',
+    'projects.apps.ProjectsConfig',
+    'deployments.apps.DeploymentsConfig',
 ]
 
 MIDDLEWARE = [
@@ -93,7 +97,7 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'coreapp.permissions.IsAdmin',
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'coreapp.utils.renderers.CustomJSONRenderer',
@@ -112,6 +116,7 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
 }
 
 # DRF Spectacular Settings
@@ -127,6 +132,9 @@ SPECTACULAR_SETTINGS = {
     'LICENSE': {
         'name': 'MIT License',
     },
-    'SCHEMA_PATH_PREFIX': '/api/v[0-9]'
+    'SCHEMA_PATH_PREFIX': '/api/v[0-9]',
+    'ENUM_NAME_OVERRIDES': {
+        'DeploymentStatusEnum': 'deployments.models.DEPLOYMENT_STATUS_CHOICES',
+    },
 }
 

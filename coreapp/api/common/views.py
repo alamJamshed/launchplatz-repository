@@ -1,133 +1,176 @@
-from rest_framework import generics, serializers
-from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.exceptions import TokenError
-from .serializers import UserProfileSerializer, LoginSerializer, CountrySerializer, StateSerializer, CitySerializer
-from rest_framework import status
+from django.contrib.auth import get_user_model
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework import generics, serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
-from drf_spectacular.utils import extend_schema
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from coreapp.models import City, Country, State
+from coreapp.permissions import IsAdmin
+from coreapp.roles import UserRoles
 from coreapp.utils.responses import APIResponse
-from coreapp.utils.email_utils import send_welcome_email
-from ...models import Country, City, State
+
+from .cookies import (
+    REFRESH_COOKIE_NAME,
+    clear_refresh_cookie,
+    set_refresh_cookie,
+)
+from .serializers import (
+    CitySerializer,
+    CountrySerializer,
+    LoginSerializer,
+    StateSerializer,
+    UserProfileSerializer,
+)
+
+
+User = get_user_model()
 
 
 class LoginResponseSerializer(serializers.Serializer):
     access = serializers.CharField()
-    refresh = serializers.CharField()
-    user = serializers.DictField()
+    user = UserProfileSerializer()
+
+
+class AccessTokenResponseSerializer(serializers.Serializer):
+    access = serializers.CharField()
+
+
+def _admin_for_refresh(refresh):
+    user = User.objects.get(pk=refresh['user_id'])
+    if not user.is_active or user.role != UserRoles.ADMIN:
+        raise TokenError('Token is not valid for an active admin')
+    return user
+
 
 @extend_schema(
     request=LoginSerializer,
     responses={200: LoginResponseSerializer},
-    description='Login with email and password to get JWT tokens'
+    description=(
+        'Authenticate an active Admin. The access token is returned in the '
+        'response and the refresh token is stored in an HttpOnly cookie.'
+    ),
 )
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
     serializer = LoginSerializer(data=request.data)
-    if serializer.is_valid():
-        user = serializer.validated_data['user']
-        refresh = RefreshToken.for_user(user)
-
-        # Send welcome email on first login
-        if not hasattr(user, 'last_login') or user.last_login is None:
-            send_welcome_email(
-                user_email=user.email,
-                user_name=user.first_name or user.email
-            )
-
-        data = {
-            'access': str(refresh.access_token),
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'role': user.role
-            }
-        }
-        
-        response = APIResponse.success(data, "Login successful")
-        # Store refresh token in secure HTTP-only cookie
-        response.set_cookie(
-            'refresh_token',
-            str(refresh),
-            max_age=7*24*60*60,  # 7 days
-            httponly=True,
-            secure=True,
-            samesite='Strict'
+    if not serializer.is_valid():
+        return APIResponse.error(
+            message='Login failed',
+            errors=serializer.errors,
+            status_code=status.HTTP_400_BAD_REQUEST,
         )
-        return response
-    return APIResponse.error(serializer.errors, "Login failed", status.HTTP_400_BAD_REQUEST)
+
+    user = serializer.validated_data['user']
+    refresh = RefreshToken.for_user(user)
+    response = APIResponse.success(
+        {
+            'access': str(refresh.access_token),
+            'user': UserProfileSerializer(user).data,
+        },
+        'Login successful',
+    )
+    return set_refresh_cookie(response, refresh)
 
 
+@extend_schema(
+    request=None,
+    responses={
+        200: AccessTokenResponseSerializer,
+        401: OpenApiResponse(description='Refresh token is missing or invalid.'),
+    },
+    description='Rotate the refresh-token cookie and return a new access token.',
+)
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def refresh_token_view(request):
-    refresh_token = request.COOKIES.get('refresh_token')
-    
-    if not refresh_token:
-        return APIResponse.error({}, "Refresh token not found. Please login again.", status.HTTP_401_UNAUTHORIZED)
-    
+    raw_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
+    if not raw_token:
+        response = APIResponse.unauthorized('Refresh token not found. Please login again.')
+        return clear_refresh_cookie(response)
+
     try:
-        refresh = RefreshToken(refresh_token)
-        data = {'access': str(refresh.access_token)}
-        return APIResponse.success(data, "Token refreshed successfully")
-    except TokenError:
-        response = APIResponse.error({}, "Refresh token expired. Please login again.", status.HTTP_401_UNAUTHORIZED)
-        response.delete_cookie('refresh_token')
-        return response
+        old_refresh = RefreshToken(raw_token)
+        user = _admin_for_refresh(old_refresh)
+        old_refresh.blacklist()
+        new_refresh = RefreshToken.for_user(user)
+    except (TokenError, User.DoesNotExist, KeyError):
+        response = APIResponse.unauthorized('Refresh token is invalid. Please login again.')
+        return clear_refresh_cookie(response)
+
+    response = APIResponse.success(
+        {'access': str(new_refresh.access_token)},
+        'Token refreshed successfully',
+    )
+    return set_refresh_cookie(response, new_refresh)
+
+
+@extend_schema(
+    request=None,
+    responses={200: OpenApiResponse(description='Logged out successfully.')},
+    description='Blacklist the current refresh token and clear its cookie.',
+)
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def logout_view(request):
+    raw_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
+    if raw_token:
+        try:
+            RefreshToken(raw_token).blacklist()
+        except TokenError:
+            pass
+
+    response = APIResponse.success(None, 'Logout successful')
+    return clear_refresh_cookie(response)
 
 
 class ProfileView(generics.RetrieveAPIView):
     serializer_class = UserProfileSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdmin]
 
     def get_object(self):
         return self.request.user
 
     def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        return APIResponse.success(serializer.data, "Profile retrieved successfully")
-
+        serializer = self.get_serializer(self.get_object())
+        return APIResponse.success(serializer.data, 'Profile retrieved successfully')
 
 
 class CountryListView(generics.ListAPIView):
     queryset = Country.objects.filter(is_active=True)
     serializer_class = CountrySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdmin]
 
     def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return APIResponse.success(serializer.data, "Countries retrieved successfully")
+        serializer = self.get_serializer(self.get_queryset(), many=True)
+        return APIResponse.success(serializer.data, 'Countries retrieved successfully')
 
 
 class StateListView(generics.ListAPIView):
     serializer_class = StateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdmin]
 
     def get_queryset(self):
-        country_id = self.kwargs.get('country_id')
-        return State.objects.filter(country_id=country_id, is_active=True)
+        return State.objects.filter(
+            country_id=self.kwargs.get('country_id'), is_active=True
+        )
 
     def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return APIResponse.success(serializer.data, "States retrieved successfully")
+        serializer = self.get_serializer(self.get_queryset(), many=True)
+        return APIResponse.success(serializer.data, 'States retrieved successfully')
 
 
 class CityListView(generics.ListAPIView):
     serializer_class = CitySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdmin]
 
     def get_queryset(self):
-        state_id = self.kwargs.get('state_id')
-        return City.objects.filter(state_id=state_id, is_active=True)
+        return City.objects.filter(
+            state_id=self.kwargs.get('state_id'), is_active=True
+        )
 
     def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return APIResponse.success(serializer.data, "Cities retrieved successfully")
+        serializer = self.get_serializer(self.get_queryset(), many=True)
+        return APIResponse.success(serializer.data, 'Cities retrieved successfully')
