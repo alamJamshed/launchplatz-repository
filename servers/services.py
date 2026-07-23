@@ -4,9 +4,27 @@ from time import perf_counter
 
 import paramiko
 from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.utils import timezone
+
+
+class SSHKeyPairGenerator:
+    @staticmethod
+    def generate():
+        key = ed25519.Ed25519PrivateKey.generate()
+        private_key = key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.OpenSSH,
+            encryption_algorithm=serialization.NoEncryption(),
+        ).decode()
+        public_key = key.public_key().public_bytes(
+            encoding=serialization.Encoding.OpenSSH,
+            format=serialization.PublicFormat.OpenSSH,
+        ).decode()
+        return private_key, f'{public_key} launchplatz'
 
 
 class ServerCredentialCipher:

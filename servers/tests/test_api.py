@@ -58,6 +58,30 @@ class ServerAPITests(APITestCase):
         self.assertEqual(server.created_by, self.admin)
         self.assertEqual(server.updated_by, self.admin)
 
+    def test_admin_can_generate_dedicated_key_during_creation(self):
+        payload = {key: value for key, value in self.payload.items() if key != 'private_key'}
+        payload['generate_key'] = True
+
+        response = self.client.post(SERVERS_URL, payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data['data']['public_key'].startswith('ssh-ed25519 '))
+        self.assertNotIn('private_key', response.data['data'])
+        server = Server.objects.get()
+        private_key = ServerCredentialCipher.decrypt(server.encrypted_private_key)
+        self.assertIn('BEGIN OPENSSH PRIVATE KEY', private_key)
+
+        listing = self.client.get(SERVERS_URL)
+        detail = self.client.get(f'{SERVERS_URL}{server.id}/')
+        self.assertNotIn('public_key', listing.data['data']['results'][0])
+        self.assertNotIn('public_key', detail.data['data'])
+
+    def test_create_rejects_pasted_and_generated_keys_together(self):
+        response = self.create_server(generate_key=True)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('private_key', response.data['errors'])
+
     def test_non_admin_cannot_access_server_api(self):
         self.client.force_authenticate(self.user)
         forbidden = self.client.get(SERVERS_URL)

@@ -11,6 +11,7 @@ from coreapp.models import User
 from servers.api.serializers import ServerSerializer
 from servers.models import Server
 from servers.services import (
+    SSHKeyPairGenerator,
     SSHConnectionTester,
     SSHKeyParser,
     ServerCredentialCipher,
@@ -19,6 +20,16 @@ from servers.tests.helpers import generate_private_key
 
 
 TEST_FERNET_KEY = 'MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA='
+
+
+class SSHKeyPairGeneratorUnitTests(SimpleTestCase):
+    def test_generates_matching_parseable_ed25519_pair(self):
+        private_key, public_key = SSHKeyPairGenerator.generate()
+
+        parsed = SSHKeyParser.parse(private_key)
+        self.assertIsInstance(parsed, paramiko.Ed25519Key)
+        self.assertTrue(public_key.startswith('ssh-ed25519 '))
+        self.assertTrue(public_key.endswith(' launchplatz'))
 
 
 class ServerCredentialCipherUnitTests(SimpleTestCase):

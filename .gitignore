@@ -3,6 +3,10 @@
 *.egg*
 /dist/
 /.idea
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.env.local
+/frontend/.env.*.local
 /docs/_build/
 /node_modules/
 build/
@@ -20,6 +24,7 @@ venv
 .env
 !.env.example
 .env.docker
+.env.staging
 media
 static
 /logs/

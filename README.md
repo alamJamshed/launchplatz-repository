@@ -1,11 +1,11 @@
-# LaunchPlatz Backend
+# LaunchPlatz
 
 LaunchPlatz is an Admin-only deployment platform for Docker-based Django and
 React projects. It connects to VPS servers over SSH, manages Git repositories
 and environment variables, runs deployments through Celery, and provides live
 Docker Compose controls and immutable deployment history.
 
-This repository contains the Django REST API. A frontend is not included.
+This repository contains the Django REST API and its React Admin application.
 
 ## Implemented Modules
 
@@ -32,25 +32,46 @@ Redis and Celery are only required when running background deployments. Normal
 CRUD, authentication, history, and synchronous management APIs do not require a
 Celery worker.
 
+## Frontend Application
+
+The `frontend/` directory contains the React, TypeScript, and Vite Admin client
+for Modules 1-8. It uses the API through Vite's `/api` proxy and is available at
+<http://127.0.0.1:5173/> when the Docker stack is running.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Use these commands before committing frontend changes:
+
+```bash
+npm run lint
+npm run typecheck
+npm run build
+npm test
+```
+
 ## Setup methods
 
 Use exactly one of the following methods to run LaunchPlatz locally:
 
-- **Method 1 - Docker setup (recommended):** Docker runs Django, PostgreSQL,
-  Redis, and Celery for you.
+- **Method 1 - Docker setup (recommended):** Docker runs the React frontend,
+  Django, PostgreSQL, Redis, and Celery for you.
 - **Method 2 - Manual setup:** You install and run Python, PostgreSQL, Redis,
   Django, and Celery yourself.
 
 Do not complete both methods. Both produce the same LaunchPlatz API at
-<http://127.0.0.1:8000/>.
+<http://127.0.0.1:8000/>. The Docker method also starts the frontend.
 
 A real deployment additionally requires a target VPS with SSH, Git, Docker
 Engine, and the Docker Compose plugin.
 
 ## Method 1 - Docker Setup (Recommended)
 
-Docker Compose runs Django, PostgreSQL, Redis, and Celery together. You do not
-need to install or start PostgreSQL or Redis separately.
+Docker Compose runs the React frontend, Django, PostgreSQL, Redis, and Celery
+together. You do not need to install Node, PostgreSQL, or Redis separately.
 
 ### Requirements
 
@@ -102,6 +123,7 @@ docker compose exec web python manage.py createsuperuser
 
 Open:
 
+- LaunchPlatz frontend: <http://127.0.0.1:5173/>
 - Swagger UI: <http://127.0.0.1:8000/api/docs/>
 - OpenAPI schema: <http://127.0.0.1:8000/api/schema/>
 - Django Admin: <http://127.0.0.1:8000/admin/>
@@ -177,6 +199,7 @@ Docker. Skip this entire section if Method 1 is already running.
 
 - Git
 - Python 3.11 or newer
+- Node.js 22 or newer
 - PostgreSQL
 - Redis when running deployments
 
@@ -310,7 +333,20 @@ Open:
 - OpenAPI schema: <http://127.0.0.1:8000/api/schema/>
 - Django Admin: <http://127.0.0.1:8000/admin/>
 
-### 8. Start Redis and Celery for deployments
+### 8. Start the frontend
+
+In another terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open the LaunchPlatz application at <http://127.0.0.1:5173/>. Vite proxies
+`/api` requests to Django on port 8000.
+
+### 9. Start Redis and Celery for deployments
 
 Deployment requests need Redis and a Celery worker in addition to Django.
 

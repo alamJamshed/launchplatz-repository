@@ -233,9 +233,11 @@ servers are visible.
 | `created_by` | integer/null | Read only | Creator user ID |
 | `updated_by` | integer/null | Read only | Last updater user ID |
 
-The private key is required on creation. Password-protected keys are not supported.
-It is encrypted with `SERVER_CREDENTIAL_ENCRYPTION_KEY` before storage. Neither the
-plain-text key nor its encrypted value is returned by the API.
+A server can use a supplied private key or set `generate_key: true` to create a
+dedicated Ed25519 key pair. Password-protected supplied keys are not supported.
+The private key is encrypted with `SERVER_CREDENTIAL_ENCRYPTION_KEY` before
+storage. Neither the plain-text key nor its encrypted value is returned by the
+API.
 
 The combination of `ip_address`, `ssh_port`, and `username` must be unique among
 non-deleted servers.
@@ -261,11 +263,17 @@ Content-Type: application/json
   "ip_address": "192.0.2.10",
   "ssh_port": 22,
   "username": "deploy",
-  "private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----\n"
+  "generate_key": true
 }
 ```
 
-Returns `201` with the saved server object, excluding the key.
+When `generate_key` is true, the `201` response includes `public_key` exactly
+once. Install that public key as a new line in the selected VPS user's
+`~/.ssh/authorized_keys`, then call Test Connection. LaunchPlatz encrypts the
+matching private key and never returns it.
+
+Alternatively, omit `generate_key` and send an existing `private_key`. The two
+options cannot be used together.
 
 ### Retrieve server
 

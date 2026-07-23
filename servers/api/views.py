@@ -7,12 +7,23 @@ from coreapp.utils.responses import APIResponse
 from servers.models import Server
 from servers.services import SSHConnectionTester
 
-from .serializers import ConnectionTestResultSerializer, ServerSerializer
+from .serializers import (
+    ConnectionTestResultSerializer,
+    ServerCreateResponseSerializer,
+    ServerSerializer,
+)
 
 
 @extend_schema_view(
     list=extend_schema(description='List active, non-deleted servers.'),
-    create=extend_schema(description='Create a server with an encrypted SSH key.'),
+    create=extend_schema(
+        request=ServerSerializer,
+        responses={201: ServerCreateResponseSerializer},
+        description=(
+            'Create a server using a pasted private key or generate a dedicated '
+            'Ed25519 key. A generated public key is returned only in this response.'
+        )
+    ),
     retrieve=extend_schema(description='Retrieve a server without its SSH key.'),
     update=extend_schema(description='Replace a server configuration.'),
     partial_update=extend_schema(description='Partially update a server configuration.'),
@@ -42,8 +53,12 @@ class ServerViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(created_by=request.user, updated_by=request.user)
-        return APIResponse.created(serializer.data, 'Server created successfully')
+        server = serializer.save(created_by=request.user, updated_by=request.user)
+        data = dict(serializer.data)
+        public_key = getattr(server, 'generated_public_key', None)
+        if public_key:
+            data['public_key'] = public_key
+        return APIResponse.created(data, 'Server created successfully')
 
     def retrieve(self, request, *args, **kwargs):
         return APIResponse.success(

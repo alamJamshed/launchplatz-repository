@@ -17,11 +17,13 @@ from .cookies import (
     set_refresh_cookie,
 )
 from .serializers import (
+    ChangePasswordSerializer,
     CitySerializer,
     CountrySerializer,
     LoginSerializer,
     StateSerializer,
     UserProfileSerializer,
+    UserProfileUpdateSerializer,
 )
 
 
@@ -126,16 +128,60 @@ def logout_view(request):
     return clear_refresh_cookie(response)
 
 
-class ProfileView(generics.RetrieveAPIView):
+class ProfileView(generics.GenericAPIView):
     serializer_class = UserProfileSerializer
     permission_classes = [IsAdmin]
 
     def get_object(self):
         return self.request.user
 
-    def retrieve(self, request, *args, **kwargs):
-        serializer = self.get_serializer(self.get_object())
-        return APIResponse.success(serializer.data, 'Profile retrieved successfully')
+    def get(self, request, *args, **kwargs):
+        return APIResponse.success(
+            self.get_serializer(self.get_object()).data,
+            'Profile retrieved successfully',
+        )
+
+    @extend_schema(
+        request=UserProfileUpdateSerializer,
+        responses={200: UserProfileSerializer},
+    )
+    def patch(self, request, *args, **kwargs):
+        user = self.get_object()
+        serializer = UserProfileUpdateSerializer(
+            user, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return APIResponse.success(
+            UserProfileSerializer(user).data,
+            'Profile updated successfully',
+        )
+
+
+class ChangePasswordView(generics.GenericAPIView):
+    serializer_class = ChangePasswordSerializer
+    permission_classes = [IsAdmin]
+
+    @extend_schema(
+        request=ChangePasswordSerializer,
+        responses={200: OpenApiResponse(description='Password changed; login required.')},
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        request.user.set_password(serializer.validated_data['new_password'])
+        request.user.save(update_fields=['password'])
+
+        raw_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
+        if raw_token:
+            try:
+                RefreshToken(raw_token).blacklist()
+            except TokenError:
+                pass
+        response = APIResponse.success(
+            None, 'Password changed successfully. Please login again.'
+        )
+        return clear_refresh_cookie(response)
 
 
 class CountryListView(generics.ListAPIView):

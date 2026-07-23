@@ -1,16 +1,18 @@
 from rest_framework import serializers
 
 from servers.models import Server
-from servers.services import SSHKeyParser, ServerCredentialCipher
+from servers.services import SSHKeyPairGenerator, SSHKeyParser, ServerCredentialCipher
 
 
 class ServerSerializer(serializers.ModelSerializer):
     private_key = serializers.CharField(write_only=True, required=False, trim_whitespace=False)
+    generate_key = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta:
         model = Server
         fields = [
             'id', 'name', 'ip_address', 'ssh_port', 'username', 'private_key',
+            'generate_key',
             'status', 'last_checked_at', 'last_latency_ms',
             'last_failure_reason',
             'created_at', 'updated_at', 'created_by', 'updated_by',
@@ -36,8 +38,19 @@ class ServerSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        if self.instance is None and not attrs.get('private_key'):
-            raise serializers.ValidationError({'private_key': 'This field is required.'})
+        generate_key = attrs.get('generate_key', False)
+        if self.instance is not None and generate_key:
+            raise serializers.ValidationError({
+                'generate_key': 'Key generation is available only when creating a server.'
+            })
+        if generate_key and attrs.get('private_key'):
+            raise serializers.ValidationError({
+                'private_key': 'Do not provide a private key when generating one.'
+            })
+        if self.instance is None and not generate_key and not attrs.get('private_key'):
+            raise serializers.ValidationError({
+                'private_key': 'Provide a private key or select Generate SSH key.'
+            })
 
         ip_address = attrs.get('ip_address', getattr(self.instance, 'ip_address', None))
         ssh_port = attrs.get('ssh_port', getattr(self.instance, 'ssh_port', 22))
@@ -57,15 +70,30 @@ class ServerSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        private_key = validated_data.pop('private_key')
+        generate_key = validated_data.pop('generate_key', False)
+        if generate_key:
+            private_key, public_key = SSHKeyPairGenerator.generate()
+        else:
+            private_key = validated_data.pop('private_key')
+            public_key = None
         validated_data['encrypted_private_key'] = ServerCredentialCipher.encrypt(private_key)
-        return super().create(validated_data)
+        instance = super().create(validated_data)
+        instance.generated_public_key = public_key
+        return instance
 
     def update(self, instance, validated_data):
+        validated_data.pop('generate_key', None)
         private_key = validated_data.pop('private_key', None)
         if private_key is not None:
             validated_data['encrypted_private_key'] = ServerCredentialCipher.encrypt(private_key)
         return super().update(instance, validated_data)
+
+
+class ServerCreateResponseSerializer(ServerSerializer):
+    public_key = serializers.CharField(read_only=True, required=False)
+
+    class Meta(ServerSerializer.Meta):
+        fields = [*ServerSerializer.Meta.fields, 'public_key']
 
 
 class ConnectionTestResultSerializer(serializers.Serializer):

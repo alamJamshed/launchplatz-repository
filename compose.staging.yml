@@ -1,0 +1,64 @@
+name: launchplatz-staging
+
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: Dockerfile.staging
+  env_file:
+    - .env.staging
+  restart: unless-stopped
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  db:
+    image: postgres:17-alpine
+    env_file:
+      - .env.staging
+    restart: unless-stopped
+    volumes:
+      - staging_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
+    volumes:
+      - staging_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    <<: *backend
+    command: ["web"]
+    ports:
+      - "127.0.0.1:8010:8000"
+
+  worker:
+    <<: *backend
+    command: ["worker"]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.staging
+      args:
+        VITE_API_BASE_URL: https://crud.dhmhs100.com/api/v1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5174:80"
+
+volumes:
+  staging_postgres_data:
+  staging_redis_data:

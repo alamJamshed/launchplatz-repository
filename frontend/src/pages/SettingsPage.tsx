@@ -1,0 +1,18 @@
+import { useState } from 'react'
+import { Alert, Button, Card, PageHeading, TextField } from '../components'
+import { useAuth } from '../auth/AuthContext'
+import { api, ApiError } from '../lib/api'
+import { fieldErrors } from '../lib/format'
+import type { UserProfile } from '../types'
+import { Notice } from './shared'
+
+export function SettingsPage() {
+  const { user, updateUser, logout } = useAuth()
+  const [profile, setProfile] = useState({ first_name: user?.first_name || '', last_name: user?.last_name || '', phone: user?.phone || '' })
+  const [passwords, setPasswords] = useState({ current_password: '', new_password: '', new_password_confirmation: '' })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [notice, setNotice] = useState<{ tone: 'success' | 'danger' | 'info'; message: string } | null>(null)
+  const saveProfile = async (event: React.FormEvent) => { event.preventDefault(); setErrors({}); try { const updated = await api.patch<UserProfile>('/auth/profile/', profile); updateUser(updated); setNotice({ tone: 'success', message: 'Profile updated.' }) } catch (reason) { setErrors(fieldErrors((reason as ApiError).errors)); setNotice({ tone: 'danger', message: (reason as Error).message }) } }
+  const changePassword = async (event: React.FormEvent) => { event.preventDefault(); setErrors({}); try { await api.post('/auth/change-password/', passwords); await logout() } catch (reason) { setErrors(fieldErrors((reason as ApiError).errors)); setNotice({ tone: 'danger', message: (reason as Error).message }) } }
+  return <><PageHeading title="Account settings" description="Manage your Admin profile and current login credentials." /><Notice value={notice} /><div className="app-two-column"><Card className="app-form-card"><h2>Profile</h2><form className="gallery-form" onSubmit={saveProfile}><TextField id="email" label="Email" value={user?.email || ''} disabled /><TextField id="role" label="Role" value={user?.role === 1 ? 'Admin' : String(user?.role)} disabled /><TextField id="first-name" label="First name" value={profile.first_name} error={errors.first_name} onChange={(event) => setProfile({ ...profile, first_name: event.target.value })} required /><TextField id="last-name" label="Last name" value={profile.last_name} error={errors.last_name} onChange={(event) => setProfile({ ...profile, last_name: event.target.value })} required /><TextField id="phone" label="Phone" value={profile.phone} error={errors.phone} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} /><Button type="submit">Save profile</Button></form></Card><Card className="app-form-card"><h2>Change password</h2><Alert tone="warning">Changing your password signs you out immediately.</Alert><form className="gallery-form" onSubmit={changePassword}><TextField id="current-password" type="password" label="Current password" error={errors.current_password} value={passwords.current_password} onChange={(event) => setPasswords({ ...passwords, current_password: event.target.value })} required /><TextField id="new-password" type="password" label="New password" error={errors.new_password} value={passwords.new_password} onChange={(event) => setPasswords({ ...passwords, new_password: event.target.value })} required /><TextField id="confirm-password" type="password" label="Confirm new password" error={errors.new_password_confirmation} value={passwords.new_password_confirmation} onChange={(event) => setPasswords({ ...passwords, new_password_confirmation: event.target.value })} required /><Button type="submit">Change password</Button></form></Card></div></>
+}

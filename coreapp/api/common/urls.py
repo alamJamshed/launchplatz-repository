@@ -9,6 +9,7 @@ urlpatterns = [
     path('logout/', logout_view, name='logout'),
     # Profile endpoint
     path('profile/', views.ProfileView.as_view(), name='profile'),
+    path('change-password/', views.ChangePasswordView.as_view(), name='change-password'),
     path('common/countries/', CountryListView.as_view(), name='countries'),
     path('common/states/<int:country_id>/', StateListView.as_view(), name='states'),
     path('common/cities/<int:state_id>/', CityListView.as_view(), name='cities'),
