@@ -10,4 +10,5 @@ urlpatterns = [
     path('servers/', include('servers.api.urls')),
     path('projects/', include('projects.api.urls')),
     path('deployments/', include('deployments.api.urls')),
+    path('routing/', include('routing.urls')),
 ]

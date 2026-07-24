@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
+from django.core.exceptions import ObjectDoesNotExist
 from django.conf import settings
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import serializers, viewsets
@@ -370,6 +371,16 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def archive(self, request, pk=None):
         project = self.get_object()
         project.archive(request.user)
+        try:
+            route = project.routing_domain.route
+        except (AttributeError, ObjectDoesNotExist):
+            route = None
+        if route:
+            route.desired_enabled = False
+            route.save(update_fields=['desired_enabled', 'updated_at'])
+            if getattr(settings, 'CELERY_BROKER_URL', None):
+                from routing.tasks import reconcile_route_task
+                reconcile_route_task.delay(route.pk)
         return APIResponse.success(
             self.get_serializer(project).data, 'Project archived successfully'
         )

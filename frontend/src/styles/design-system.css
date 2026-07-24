@@ -214,3 +214,6 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .app-detail-card dd { margin: 0; overflow-wrap: anywhere; }
 .app-block { display: block; }
 @media (max-width: 800px) { .app-stat-grid, .app-two-column, .app-filter-grid { grid-template-columns: 1fr; } }
+label:has(> #domain) {
+  display: none;
+}

@@ -56,6 +56,9 @@ DOCKER_LOG_MAX_LINES = config('DOCKER_LOG_MAX_LINES', default=1000, cast=int)
 DOCKER_LOG_MAX_CHARACTERS = config(
     'DOCKER_LOG_MAX_CHARACTERS', default=200000, cast=int
 )
+ROUTING_ACME_CA_SERVER = config(
+    'ROUTING_ACME_CA_SERVER', default='https://pebble:14000/dir'
+)
 
 # Frontend URL for email links
 FRONTEND_URL = config('FRONTEND_URL')

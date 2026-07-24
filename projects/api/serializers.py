@@ -2,7 +2,6 @@ from rest_framework import serializers
 
 from projects.models import EnvironmentVariable, GitOperation, Project
 from projects.environment_services import EnvironmentCredentialCipher
-from projects.validators import normalize_and_validate_domain
 from projects.git_services import GitCredentialCipher
 from servers.services import SSHKeyParser
 from servers.models import Server
@@ -36,6 +35,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             'git_cloned_at', 'current_branch', 'current_commit',
             'last_git_synced_at',
             'created_by', 'updated_by',
+            'domain',
         ]
 
     def validate_git_private_key(self, value):
@@ -46,9 +46,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(exc.messages[0]) from exc
             raise
         return value
-
-    def validate_domain(self, value):
-        return normalize_and_validate_domain(value)
 
     def validate(self, attrs):
         server = attrs.get('server', getattr(self.instance, 'server', None))

@@ -14,6 +14,7 @@ import { DeploymentsPage } from './pages/DeploymentsPage'
 import { DeploymentHistoryPage } from './pages/DeploymentHistoryPage'
 import { DeploymentDetailPage } from './pages/DeploymentDetailPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { RoutingPage } from './pages/RoutingPage'
 
 export default function App() {
   return <Routes>
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="projects/:projectId/overview" element={<ProjectOverviewPage />} />
         <Route path="projects/:projectId/git" element={<GitPage />} />
         <Route path="projects/:projectId/environment" element={<EnvironmentPage />} />
+        <Route path="projects/:projectId/routing" element={<RoutingPage />} />
         <Route path="projects/:projectId/deployments" element={<ProjectDeploymentsPage />} />
         <Route path="projects/:projectId/containers" element={<ContainersPage />} />
         <Route path="deployments" element={<DeploymentsPage />} />

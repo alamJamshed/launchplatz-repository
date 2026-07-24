@@ -22,7 +22,7 @@ export function AppLayout() {
 }
 
 export const projectTabs = [
-  ['overview', 'Overview'], ['git', 'Git'], ['environment', 'Environment'], ['deployments', 'Deployments'], ['containers', 'Containers'],
+    ['overview', 'Overview'], ['git', 'Git'], ['environment', 'Environment'], ['routing', 'Routing'], ['deployments', 'Deployments'], ['containers', 'Containers'],
 ] as const
 
 export function ProjectTabs({ projectId, active }: { projectId: number; active: string }) {

@@ -7,6 +7,7 @@ from time import perf_counter
 
 import paramiko
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import close_old_connections
 from django.utils import timezone
 
@@ -42,6 +43,16 @@ class RemoteDeploymentService(RemoteGitService):
         self.deployment = deployment
         self.pid_file = None
         self.ignore_cancellation = False
+        try:
+            route = project.routing_domain.route
+        except (AttributeError, ObjectDoesNotExist):
+            route = None
+        self.routing_override_enabled = bool(
+            route
+            and route.desired_enabled
+            and route.configuration_revision
+            and not project.is_archived
+        )
 
     def __enter__(self):
         try:
@@ -145,7 +156,12 @@ class RemoteDeploymentService(RemoteGitService):
 
     def _compose(self):
         compose_file = f'{self.workspace}/{self.project.docker_compose_path}'
-        return f'docker compose -f {shlex.quote(compose_file)}'
+        command = f'docker compose -f {shlex.quote(compose_file)}'
+        if self.routing_override_enabled:
+            command += (
+                f' -f {shlex.quote(self.workspace + "/.launchplatz-routing.yml")}'
+            )
+        return command
 
     def pull_code(self):
         previous = self._run(

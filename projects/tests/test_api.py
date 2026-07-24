@@ -46,7 +46,7 @@ class ProjectAPITests(APITestCase):
         data = created.data['data']
         self.assertEqual(data['framework'], Project.Framework.DJANGO_REACT)
         self.assertEqual(data['framework_display'], 'Django + React')
-        self.assertEqual(data['domain'], 'app.example.com')
+        self.assertEqual(data['domain'], '')
         self.assertNotIn('environment_variables', data)
         project = Project.objects.get()
         self.assertEqual(project.created_by, self.admin)
@@ -93,7 +93,6 @@ class ProjectAPITests(APITestCase):
         cases = [
             {'git_repository_url': 'http://github.com/example/project.git'},
             {'git_repository_url': 'https://user:secret@github.com/a/b.git'},
-            {'domain': 'https://example.com'},
             {'docker_compose_path': '../docker-compose.yml'},
         ]
         for index, invalid in enumerate(cases):

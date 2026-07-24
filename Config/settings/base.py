@@ -22,7 +22,19 @@ INSTALLED_APPS = [
     'servers.apps.ServersConfig',
     'projects.apps.ProjectsConfig',
     'deployments.apps.DeploymentsConfig',
+    'routing.apps.RoutingConfig',
 ]
+
+CELERY_BEAT_SCHEDULE = {
+    'reconcile-routes-every-five-minutes': {
+        'task': 'routing.reconcile_all_routes',
+        'schedule': 300.0,
+    },
+    'verify-routing-dns-every-five-minutes': {
+        'task': 'routing.verify_all_domains',
+        'schedule': 300.0,
+    },
+}
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
